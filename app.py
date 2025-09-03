@@ -153,6 +153,46 @@ def download_file(dirname, format):
     else:
         abort(400)
 
+@app.route('/cost/<dirname>')
+def get_cost_info(dirname):
+    """Get cost information for a translated PDF."""
+    try:
+        cost_summary_path = os.path.join(DATA_DIR, dirname, 'cost_summary.json')
+        
+        if not os.path.exists(cost_summary_path):
+            return jsonify({'error': 'Cost information not available'}), 404
+        
+        with open(cost_summary_path, 'r', encoding='utf-8') as f:
+            import json
+            cost_data = json.load(f)
+        
+        return jsonify(cost_data), 200
+        
+    except Exception as e:
+        logger.error(f"Error retrieving cost info for {dirname}: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve cost information'}), 500
+
+@app.route('/original/<dirname>')
+def view_original_pdf(dirname):
+    """Serve the original PDF file for viewing/downloading."""
+    try:
+        pdf_dir = os.path.join(DATA_DIR, dirname)
+        
+        # Find the PDF file in the directory
+        pdf_files = [f for f in os.listdir(pdf_dir) if f.lower().endswith('.pdf')]
+        
+        if not pdf_files:
+            abort(404)
+        
+        # Use the first PDF file found (should only be one)
+        pdf_filename = pdf_files[0]
+        
+        return send_from_directory(pdf_dir, pdf_filename, as_attachment=False)
+        
+    except Exception as e:
+        logger.error(f"Error serving original PDF for {dirname}: {str(e)}")
+        abort(404)
+
 @app.route('/delete/<dirname>', methods=['POST'])
 def delete_file(dirname):
     dir_path = os.path.join(DATA_DIR, dirname)

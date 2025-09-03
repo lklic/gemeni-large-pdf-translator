@@ -11,6 +11,8 @@ A production-ready web application that translates PDF documents using Google's 
 - **Multiple Export Formats**: Download as Markdown, TXT, DOCX, or PDF
 - **Real-time Progress**: Live progress tracking during translation
 - **Web Preview**: View translated documents in the browser
+- **Cost Tracking**: Real-time Google Gemini API cost monitoring with detailed breakdowns
+- **Original PDF Access**: View and download original uploaded PDF files
 - **Concurrent Processing**: Efficient multi-threaded translation pipeline
 - **Production Ready**: Dockerized with proper logging and health checks
 
@@ -74,6 +76,49 @@ FLASK_ENV=production
 - **Supported formats**: PDF only
 - **Concurrent translations**: Up to 8 pages simultaneously
 
+## Cost Tracking
+
+The application includes comprehensive cost tracking for Google Gemini API usage, providing real-time monitoring and detailed breakdowns of translation costs.
+
+### Features
+
+- **Real-time Cost Calculation**: Tracks input/output tokens for every API call
+- **Tier-based Pricing**: Automatically applies Google's pricing tiers based on token usage
+- **Operation Breakdown**: Separate cost tracking for transcription vs translation operations
+- **Per-document Analysis**: Individual cost summaries saved with each translation
+- **Web Interface Display**: Cost information visible in the file management interface
+
+### Pricing Structure
+
+The system uses Google Gemini's official pricing tiers:
+
+**Input Tokens:**
+- ≤200k tokens: $1.25 per 1M tokens
+- >200k tokens: $2.50 per 1M tokens
+
+**Output Tokens:**
+- ≤200k tokens: $10.00 per 1M tokens
+- >200k tokens: $15.00 per 1M tokens
+
+### Cost Data Storage
+
+For each translated document, cost information is stored in:
+- `cost_summary.json` - Summary with total costs and breakdowns
+- `cost_log.json` - Detailed log of individual API calls
+
+### Accessing Cost Information
+
+**Web Interface:**
+- View total cost for each document in the file list
+- Click "Cost" button for detailed breakdown including:
+  - Total cost and token usage
+  - Operation-specific costs (transcription vs translation)
+  - Average cost per API call
+  - Pricing tier information
+
+**API Endpoint:**
+- `GET /cost/<dirname>` - Returns JSON cost data for a document
+
 ## Usage
 
 ### Web Interface
@@ -81,8 +126,10 @@ FLASK_ENV=production
 1. **Upload**: Drag and drop or browse for PDF files
 2. **Monitor**: Watch real-time translation progress
 3. **Preview**: View translated content in the web interface
-4. **Download**: Export in multiple formats (MD, TXT, DOCX, PDF)
-5. **Manage**: Delete completed translations
+4. **Cost Analysis**: View real-time costs and detailed breakdowns for each document
+5. **Original Access**: View and download original PDF files
+6. **Download**: Export in multiple formats (MD, TXT, DOCX, PDF)
+7. **Manage**: Delete completed translations
 
 ### API Endpoints
 
@@ -92,6 +139,8 @@ FLASK_ENV=production
 - `GET /files` - List all translated documents
 - `GET /view/<dirname>` - View translated content
 - `GET /download/<dirname>/<format>` - Download in specified format
+- `GET /cost/<dirname>` - Get cost information for translated document
+- `GET /original/<dirname>` - View/download original PDF file
 - `POST /delete/<dirname>` - Delete translation
 - `GET /health` - Health check endpoint
 
@@ -170,16 +219,36 @@ docker run --rm -v translation_logs:/logs -v $(pwd):/backup alpine tar -czf /bac
    - Extract images from PDF pages
    - Use Gemini Vision to transcribe to Markdown
    - Preserve formatting and structure
+   - Track API costs for transcription operations
 
 2. **Stage 2: Translation**
    - Translate transcribed text to English
    - Maintain Markdown formatting
    - Preserve academic terminology
+   - Track API costs for translation operations
 
 3. **Stage 3: Compilation**
    - Combine all translated pages
    - Add page delimiters
    - Generate final document
+   - Save cost summary and detailed logs
+
+### Cost Tracking Pipeline
+
+1. **Token Extraction**
+   - Parse Gemini API responses for usage metadata
+   - Extract input and output token counts
+   - Handle different response formats
+
+2. **Cost Calculation**
+   - Apply tier-based pricing based on cumulative token usage
+   - Calculate costs per API call and operation type
+   - Maintain running totals with thread-safe operations
+
+3. **Data Persistence**
+   - Log individual API calls with timestamps and costs
+   - Generate comprehensive cost summaries
+   - Store data in JSON format alongside translations
 
 ### File Structure
 
@@ -187,6 +256,7 @@ docker run --rm -v translation_logs:/logs -v $(pwd):/backup alpine tar -czf /bac
 translation-agent/
 ├── app.py                 # Flask application
 ├── translate.py           # Translation pipeline
+├── cost_tracker.py        # Cost tracking system
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile            # Container definition
 ├── docker-compose.yml    # Docker orchestration
@@ -197,10 +267,12 @@ translation-agent/
 │   └── index.html
 └── data/                 # Translation data (volume)
     └── <document-name>/
-        ├── original.pdf
-        ├── transcription/
-        ├── translation/
-        └── translated.md
+        ├── <original-filename>.pdf  # Original uploaded PDF
+        ├── cost_summary.json        # Cost summary and breakdown
+        ├── cost_log.json           # Detailed API call logs
+        ├── transcription/          # Page transcription files
+        ├── translation/            # Page translation files
+        └── translated.md           # Final translated document
 ```
 
 ## Troubleshooting

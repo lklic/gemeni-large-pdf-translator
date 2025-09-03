@@ -12,6 +12,7 @@ import re
 import time
 import logging
 from threading import Lock
+from cost_tracker import GeminiCostTracker, extract_token_usage
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,6 +24,9 @@ model = genai.GenerativeModel('gemini-2.5-pro')
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+MAX_RETRY_ATTEMPTS = 5  # Single source of truth for retry attempts
 
 # Thread-safe progress tracking
 progress_lock = Lock()
@@ -61,14 +65,14 @@ def clean_and_validate_markdown(text):
     
     return text.strip()
 
-def transcribe_page_to_markdown(image, page_num, filename):
+def transcribe_page_to_markdown(image, page_num, filename, cost_tracker=None):
     """Stage 1: Transcribe page to markdown with perfect layout preservation."""
     logger.info(f"[{filename}] Starting transcription for page {page_num}")
     start_time = time.time()
     
-    for attempt in range(3):
+    for attempt in range(MAX_RETRY_ATTEMPTS):
         try:
-            logger.info(f"[{filename}] Page {page_num} transcription attempt {attempt + 1}/3")
+            logger.info(f"[{filename}] Page {page_num} transcription attempt {attempt + 1}/{MAX_RETRY_ATTEMPTS}")
             
             response = model.generate_content([
                 """TASK: Extract text as clean markdown with perfect layout preservation
@@ -94,6 +98,12 @@ OUTPUT: Clean markdown with perfect layout preservation and NO HTML markup.""",
                 image
             ])
             
+            # Track cost if cost_tracker is provided
+            if cost_tracker:
+                input_tokens, output_tokens = extract_token_usage(response)
+                elapsed_time = time.time() - start_time
+                cost_tracker.log_api_call('transcription', page_num, input_tokens, output_tokens, elapsed_time)
+            
             transcribed_text = clean_and_validate_markdown(response.text)
             elapsed_time = time.time() - start_time
             
@@ -103,21 +113,21 @@ OUTPUT: Clean markdown with perfect layout preservation and NO HTML markup.""",
         except Exception as e:
             elapsed_time = time.time() - start_time
             logger.error(f"[{filename}] Page {page_num} transcription attempt {attempt + 1} failed after {elapsed_time:.2f}s: {e}")
-            if attempt == 2:
-                error_msg = f"Error: Could not transcribe page {page_num} after 3 attempts. {e}"
+            if attempt == MAX_RETRY_ATTEMPTS - 1:
+                error_msg = f"Error: Could not transcribe page {page_num} after {MAX_RETRY_ATTEMPTS} attempts. {e}"
                 logger.error(f"[{filename}] Page {page_num} transcription failed completely")
                 return error_msg
     
-    return "Error: Transcription failed after multiple attempts."
+    return f"Error: Transcription failed after {MAX_RETRY_ATTEMPTS} attempts."
 
-def translate_markdown_page(markdown_text, page_num, filename):
+def translate_markdown_page(markdown_text, page_num, filename, cost_tracker=None):
     """Stage 2: Translate markdown text to English."""
     logger.info(f"[{filename}] Starting translation for page {page_num}")
     start_time = time.time()
     
-    for attempt in range(3):
+    for attempt in range(MAX_RETRY_ATTEMPTS):
         try:
-            logger.info(f"[{filename}] Page {page_num} translation attempt {attempt + 1}/3")
+            logger.info(f"[{filename}] Page {page_num} translation attempt {attempt + 1}/{MAX_RETRY_ATTEMPTS}")
             
             response = model.generate_content([
                 f"""TASK: Translate the text to English
@@ -144,6 +154,12 @@ CRITICAL: Output clean markdown only - NO HTML tags or code blocks
 {markdown_text}"""
             ])
             
+            # Track cost if cost_tracker is provided
+            if cost_tracker:
+                input_tokens, output_tokens = extract_token_usage(response)
+                elapsed_time = time.time() - start_time
+                cost_tracker.log_api_call('translation', page_num, input_tokens, output_tokens, elapsed_time)
+            
             translated_text = clean_and_validate_markdown(response.text)
             elapsed_time = time.time() - start_time
             
@@ -153,12 +169,12 @@ CRITICAL: Output clean markdown only - NO HTML tags or code blocks
         except Exception as e:
             elapsed_time = time.time() - start_time
             logger.error(f"[{filename}] Page {page_num} translation attempt {attempt + 1} failed after {elapsed_time:.2f}s: {e}")
-            if attempt == 2:
-                error_msg = f"Error: Could not translate page {page_num} after 3 attempts. {e}"
+            if attempt == MAX_RETRY_ATTEMPTS - 1:
+                error_msg = f"Error: Could not translate page {page_num} after {MAX_RETRY_ATTEMPTS} attempts. {e}"
                 logger.error(f"[{filename}] Page {page_num} translation failed completely")
                 return error_msg
     
-    return "Error: Translation failed after multiple attempts."
+    return f"Error: Translation failed after {MAX_RETRY_ATTEMPTS} attempts."
 
 def save_page_file(content, page_num, folder_path, stage_name, filename):
     """Save individual page content to specified folder."""
@@ -220,7 +236,7 @@ def compile_final_document(translation_folder, output_path, filename, num_pages)
         logger.error(f"[{filename}] Compilation failed after {elapsed_time:.2f}s: {e}")
         return False
 
-def transcribe_single_page(page_data, transcription_folder, filename, progress_tracker):
+def transcribe_single_page(page_data, transcription_folder, filename, progress_tracker, cost_tracker=None):
     """Transcribe a single page and save it."""
     page_num, image, is_blank = page_data
     
@@ -237,7 +253,7 @@ def transcribe_single_page(page_data, transcription_folder, filename, progress_t
         return page_num, ""
     
     # Transcribe the page
-    transcribed_text = transcribe_page_to_markdown(image, page_num, filename)
+    transcribed_text = transcribe_page_to_markdown(image, page_num, filename, cost_tracker)
     
     # Save transcription
     if not save_page_file(transcribed_text, page_num, transcription_folder, "transcription", filename):
@@ -251,7 +267,7 @@ def transcribe_single_page(page_data, transcription_folder, filename, progress_t
     
     return page_num, transcribed_text
 
-def translate_single_page(page_num, transcribed_text, translation_folder, filename, progress_tracker):
+def translate_single_page(page_num, transcribed_text, translation_folder, filename, progress_tracker, cost_tracker=None):
     """Translate a single transcribed page and save it."""
     if not transcribed_text or transcribed_text.startswith("Error:"):
         # Save error or empty content
@@ -266,7 +282,7 @@ def translate_single_page(page_num, transcribed_text, translation_folder, filena
         return page_num, transcribed_text
     
     # Translate the page
-    translated_text = translate_markdown_page(transcribed_text, page_num, filename)
+    translated_text = translate_markdown_page(transcribed_text, page_num, filename, cost_tracker)
     
     # Save translation
     if not save_page_file(translated_text, page_num, translation_folder, "translation", filename):
@@ -281,7 +297,7 @@ def translate_single_page(page_num, transcribed_text, translation_folder, filena
     return page_num, translated_text
 
 def translate_pdf(pdf_path, translation_progress):
-    """Enhanced three-stage PDF translation with true concurrent processing."""
+    """Enhanced three-stage PDF translation with true concurrent processing and cost tracking."""
     filename = os.path.basename(pdf_path)
     logger.info(f"[{filename}] Starting enhanced PDF translation process")
     start_time = time.time()
@@ -302,6 +318,10 @@ def translate_pdf(pdf_path, translation_progress):
     os.makedirs(pdf_dir, exist_ok=True)
     os.makedirs(transcription_folder, exist_ok=True)
     os.makedirs(translation_folder, exist_ok=True)
+
+    # Initialize cost tracker
+    cost_tracker = GeminiCostTracker(pdf_dir, filename)
+    logger.info(f"[{filename}] Cost tracking initialized")
 
     try:
         # Extract pages from PDF
@@ -339,7 +359,7 @@ def translate_pdf(pdf_path, translation_progress):
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as transcription_executor:
             # Submit all transcription tasks at once
             transcription_futures = {
-                transcription_executor.submit(transcribe_single_page, page_data, transcription_folder, filename, progress_tracker): page_data[0]
+                transcription_executor.submit(transcribe_single_page, page_data, transcription_folder, filename, progress_tracker, cost_tracker): page_data[0]
                 for page_data in page_images
             }
             
@@ -354,7 +374,7 @@ def translate_pdf(pdf_path, translation_progress):
                     
                     # Immediately start translation for this page
                     translation_future = translation_executor.submit(
-                        translate_single_page, page_num, transcribed_text, translation_folder, filename, progress_tracker
+                        translate_single_page, page_num, transcribed_text, translation_folder, filename, progress_tracker, cost_tracker
                     )
                     translation_futures[translation_future] = page_num
                 
@@ -377,7 +397,21 @@ def translate_pdf(pdf_path, translation_progress):
             translation_progress[filename] = -1
             logger.error(f"[{filename}] PDF translation failed during compilation")
             
+        # Save cost tracking data
+        cost_tracker.save_cost_log()
+        cost_summary = cost_tracker.save_cost_summary()
+        
+        if cost_summary:
+            logger.info(f"[{filename}] Cost tracking completed - Total: ${cost_summary['total_cost']:.6f}")
+        
     except Exception as e:
         elapsed_time = time.time() - start_time
         logger.error(f"[{filename}] Enhanced PDF translation failed after {elapsed_time:.2f}s: {e}")
         translation_progress[filename] = -1
+        
+        # Still save cost data even if translation failed
+        try:
+            cost_tracker.save_cost_log()
+            cost_tracker.save_cost_summary()
+        except Exception as cost_error:
+            logger.error(f"[{filename}] Failed to save cost data: {cost_error}")

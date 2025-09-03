@@ -181,9 +181,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     <i class="fas fa-file-pdf"></i>
                     ${file.name}
                 </div>
-                <div class="file-timestamp">
-                    <i class="fas fa-clock"></i>
-                    ${file.timestamp}
+                <div class="file-meta">
+                    <div class="file-timestamp">
+                        <i class="fas fa-clock"></i>
+                        ${file.timestamp}
+                    </div>
+                    <div class="file-cost" id="cost-${file.name}">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span class="cost-loading">Loading...</span>
+                    </div>
                 </div>
             </div>
             <div class="file-actions">
@@ -191,6 +197,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <i class="fas fa-eye"></i>
                     View
                 </button>
+                <button class="action-btn cost-btn" data-filename="${file.name}">
+                    <i class="fas fa-chart-line"></i>
+                    Cost
+                </button>
+                <a href="/original/${file.name}" class="action-btn original-btn" target="_blank">
+                    <i class="fas fa-file-pdf"></i>
+                    Original PDF
+                </a>
                 <a href="/download/${file.name}/md" class="action-btn download-btn" download>
                     <i class="fas fa-download"></i>
                     MD
@@ -215,9 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add event listeners
         const viewBtn = div.querySelector('.view-btn');
+        const costBtn = div.querySelector('.cost-btn');
         const deleteBtn = div.querySelector('.delete-btn');
 
         viewBtn.addEventListener('click', () => viewFile(file.name));
+        costBtn.addEventListener('click', () => showCostDetails(file.name));
         deleteBtn.addEventListener('click', () => deleteFile(file.name));
 
         // Add download event listeners for analytics
@@ -228,6 +244,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(`Downloading ${file.name} as ${format}...`, 'info');
             });
         });
+
+        // Add original PDF button event listener
+        const originalBtn = div.querySelector('.original-btn');
+        if (originalBtn) {
+            originalBtn.addEventListener('click', (e) => {
+                showToast(`Opening original PDF: ${file.name}`, 'info');
+            });
+        }
+
+        // Load cost information
+        loadCostInfo(file.name);
 
         return div;
     }
@@ -423,6 +450,153 @@ document.addEventListener('DOMContentLoaded', () => {
         dragCounter = 0;
         document.body.classList.remove('drag-active');
     });
+
+    // Load Cost Information
+    function loadCostInfo(filename) {
+        fetch(`/cost/${filename}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Cost info not available');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const costElement = document.getElementById(`cost-${filename}`);
+                if (costElement) {
+                    const costSpan = costElement.querySelector('.cost-loading');
+                    if (costSpan) {
+                        costSpan.textContent = `$${data.total_cost.toFixed(4)}`;
+                        costSpan.className = 'cost-amount';
+                    }
+                }
+            })
+            .catch(error => {
+                const costElement = document.getElementById(`cost-${filename}`);
+                if (costElement) {
+                    const costSpan = costElement.querySelector('.cost-loading');
+                    if (costSpan) {
+                        costSpan.textContent = 'N/A';
+                        costSpan.className = 'cost-unavailable';
+                    }
+                }
+            });
+    }
+
+    // Show Cost Details
+    function showCostDetails(filename) {
+        showToast('Loading cost details...', 'info');
+        
+        fetch(`/cost/${filename}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Cost information not available');
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayCostModal(data);
+            })
+            .catch(error => {
+                console.error('Error loading cost details:', error);
+                showToast('Cost information not available for this document', 'error');
+            });
+    }
+
+    // Display Cost Modal
+    function displayCostModal(costData) {
+        const modalTitle = document.querySelector('.modal-title');
+        modalTitle.textContent = `Cost Analysis - ${costData.filename}`;
+        
+        modalContent.innerHTML = `
+            <div class="cost-summary">
+                <div class="cost-header">
+                    <h3><i class="fas fa-chart-line"></i> Translation Cost Summary</h3>
+                    <div class="total-cost">
+                        <span class="cost-label">Total Cost:</span>
+                        <span class="cost-value">$${costData.total_cost.toFixed(6)}</span>
+                    </div>
+                </div>
+                
+                <div class="cost-breakdown">
+                    <div class="cost-section">
+                        <h4><i class="fas fa-info-circle"></i> Overview</h4>
+                        <div class="cost-grid">
+                            <div class="cost-item">
+                                <span class="label">Total API Calls:</span>
+                                <span class="value">${costData.total_calls}</span>
+                            </div>
+                            <div class="cost-item">
+                                <span class="label">Input Tokens:</span>
+                                <span class="value">${costData.total_input_tokens.toLocaleString()}</span>
+                            </div>
+                            <div class="cost-item">
+                                <span class="label">Output Tokens:</span>
+                                <span class="value">${costData.total_output_tokens.toLocaleString()}</span>
+                            </div>
+                            <div class="cost-item">
+                                <span class="label">Cost per Page:</span>
+                                <span class="value">$${costData.cost_per_page.toFixed(6)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="cost-section">
+                        <h4><i class="fas fa-tasks"></i> Operation Breakdown</h4>
+                        <div class="operation-breakdown">
+                            <div class="operation-item">
+                                <div class="operation-header">
+                                    <span class="operation-name">
+                                        <i class="fas fa-file-text"></i> Transcription
+                                    </span>
+                                    <span class="operation-cost">$${costData.breakdown.transcription.cost.toFixed(6)}</span>
+                                </div>
+                                <div class="operation-details">
+                                    <span>${costData.breakdown.transcription.calls} calls</span>
+                                    <span>Avg: $${costData.breakdown.transcription.avg_cost_per_call.toFixed(6)}/call</span>
+                                </div>
+                            </div>
+                            
+                            <div class="operation-item">
+                                <div class="operation-header">
+                                    <span class="operation-name">
+                                        <i class="fas fa-language"></i> Translation
+                                    </span>
+                                    <span class="operation-cost">$${costData.breakdown.translation.cost.toFixed(6)}</span>
+                                </div>
+                                <div class="operation-details">
+                                    <span>${costData.breakdown.translation.calls} calls</span>
+                                    <span>Avg: $${costData.breakdown.translation.avg_cost_per_call.toFixed(6)}/call</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="cost-section">
+                        <h4><i class="fas fa-dollar-sign"></i> Pricing Information</h4>
+                        <div class="pricing-info">
+                            <div class="pricing-tier">
+                                <strong>Input Tokens:</strong>
+                                <div>${costData.pricing_info.input_tier1}</div>
+                                <div>${costData.pricing_info.input_tier2}</div>
+                            </div>
+                            <div class="pricing-tier">
+                                <strong>Output Tokens:</strong>
+                                <div>${costData.pricing_info.output_tier1}</div>
+                                <div>${costData.pricing_info.output_tier2}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="cost-footer">
+                        <small><i class="fas fa-clock"></i> Generated: ${new Date(costData.timestamp).toLocaleString()}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
 
     // Add global drag styles
     const dragStyle = document.createElement('style');
