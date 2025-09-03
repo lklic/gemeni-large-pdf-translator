@@ -1,0 +1,4 @@
+FLASK_APP=app.py
+FLASK_DEBUG=true
+DYLD_LIBRARY_PATH=/opt/homebrew/lib
+FLASK_RUN_PORT=5001

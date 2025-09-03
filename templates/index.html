@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Translator - AI-Powered Document Translation</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-language"></i>
+                    <h1>PDF Translator</h1>
+                </div>
+                <p class="subtitle">AI-powered document translation maintaining formatting</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-card">
+                    <div id="drop-zone" class="drop-zone">
+                        <div class="drop-zone-content">
+                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                            <h3>Upload your PDF</h3>
+                            <p>Drag & drop your PDF file here or click to browse</p>
+                            <button class="browse-btn">
+                                <i class="fas fa-folder-open"></i>
+                                Browse Files
+                            </button>
+                        </div>
+                        <input type="file" id="file-input" accept=".pdf" hidden>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div id="progress-container" class="progress-container" style="display: none;">
+                        <div class="progress-header">
+                            <span class="progress-label">Translating document...</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div id="progress-bar" class="progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Files Section -->
+            <section class="files-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-file-alt"></i> Translated Documents</h2>
+                    <div class="files-count">
+                        <span id="files-count">0</span> documents
+                    </div>
+                </div>
+                
+                <div class="files-container">
+                    <div id="empty-state" class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h3>No documents yet</h3>
+                        <p>Upload a PDF to get started with translation</p>
+                    </div>
+                    <div id="file-list" class="file-list"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Document Preview</h3>
+                <button class="close-button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="markdown-content" class="markdown-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

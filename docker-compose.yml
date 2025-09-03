@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  translation-agent:
+    build: .
+    container_name: translation-agent
+    ports:
+      - "5001:5000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - FLASK_ENV=production
+    volumes:
+      - ./data:/app/data
+      - translation_logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  translation_logs:
+    driver: local
