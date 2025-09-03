@@ -2,6 +2,8 @@
 
 A production-ready web application that translates PDF documents using Google's Gemini AI. The application extracts text from PDFs, translates it to English while preserving formatting, and provides multiple download formats.
 
+![screenshot](image.png)
+
 ## Features
 
 - **PDF Upload & Translation**: Upload PDF files and get AI-powered translations
@@ -32,7 +34,7 @@ A production-ready web application that translates PDF documents using Google's 
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/lklic/gemeni-large-pdf-translator.git
    cd translation-agent
    ```
 
@@ -49,7 +51,7 @@ A production-ready web application that translates PDF documents using Google's 
    ```
 
 4. **Access the application**
-   - Open your browser to `http://localhost:5000`
+   - Open your browser to `http://localhost:5001`
    - Upload a PDF file and start translating!
 
 ## Configuration
@@ -223,15 +225,6 @@ cat .env
 docker-compose logs translation-agent
 ```
 
-**Out of disk space**
-```bash
-# Clean up old translations
-rm -rf ./data/old-translations/
-
-# Clean Docker images
-docker system prune -a
-```
-
 ### Health Checks
 
 ```bash
@@ -250,31 +243,10 @@ docker-compose ps
 - No sensitive data in logs
 - Designed for deployment behind reverse proxy
 
-## Performance
-
-- **Concurrent Processing**: Up to 8 pages processed simultaneously
-- **Memory Usage**: ~500MB per container
-- **Storage**: ~10MB per translated document
-- **Translation Speed**: ~30-60 seconds per page (depending on complexity)
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with Docker
-5. Submit a pull request
 
 ## License
 
 This project is licensed under the MIT License.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review Docker logs
-3. Create an issue on GitHub
 
 ---
 
