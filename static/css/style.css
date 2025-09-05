@@ -388,7 +388,8 @@ body {
     margin-bottom: var(--space-md);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: var(--space-md);
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
@@ -414,6 +415,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
+    flex: 1;
+    min-width: 0; /* Allow shrinking */
 }
 
 .file-name {
@@ -423,6 +426,9 @@ body {
     display: flex;
     align-items: center;
     gap: var(--space-xs);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 
 .file-name i {
@@ -438,6 +444,7 @@ body {
     display: flex;
     gap: var(--space-xs);
     align-items: center;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
 }
 
 .action-btn {
